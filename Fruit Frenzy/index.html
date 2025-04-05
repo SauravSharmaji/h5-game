@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fruit Frenzy</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f5f5f5;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 80vh;
+      margin: 0 auto;
+      background: linear-gradient(to bottom, #a8e063, #56ab2f);
+      border: 5px solid #333;
+      border-radius: 10px;
+    }
+    .fruit {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+    #basket {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 60px;
+      background: url('./img/basket.png') no-repeat center;
+      background-size: contain;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #fff;
+    }
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    #play-button, #audio-button {
+      font-size: 1.5rem;
+      margin: 5px;
+      cursor: pointer;
+    }
+    #game-over {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 2rem;
+    }
+    #start-button {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px 40px;
+      font-size: 2rem;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    #start-button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <button id="start-button">Play</button>
+    <div id="score">Score: 0</div>
+    <div id="controls">
+      <i id="play-button" class="fas fa-play-circle text-success"></i>
+      <i id="audio-button" class="fas fa-volume-up text-primary"></i>
+    </div>
+    <i id="basket"></i>
+    <div id="game-over">Game Over!<br><button id="restart-button" class="btn btn-primary mt-3">Restart</button></div>
+  </div>
+
+  <script>
+    const gameContainer = document.getElementById('game-container');
+    const startButton = document.getElementById('start-button');
+    const basket = document.getElementById('basket');
+    const scoreDisplay = document.getElementById('score');
+    const playButton = document.getElementById('play-button');
+    const audioButton = document.getElementById('audio-button');
+    const gameOverDisplay = document.getElementById('game-over');
+    const restartButton = document.getElementById('restart-button');
+
+    let score = 0;
+    let isPlaying = false;
+    let audioOn = true;
+    let gameInterval;
+
+    const gameAudio = new Audio('https://www.soundjay.com/button/beep-07.wav'); // Example sound
+
+    // Start game from Play button
+    startButton.addEventListener('click', () => {
+      startButton.style.display = 'none';
+      startGame();
+    });
+
+    // Toggle play and pause
+    playButton.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      playButton.classList.toggle('fa-play-circle', !isPlaying);
+      playButton.classList.toggle('fa-pause-circle', isPlaying);
+
+      if (isPlaying) {
+        startGame();
+      } else {
+        stopGame();
+      }
+    });
+
+    // Toggle audio on and off
+    audioButton.addEventListener('click', () => {
+      audioOn = !audioOn;
+      audioButton.classList.toggle('fa-volume-up', audioOn);
+      audioButton.classList.toggle('fa-volume-mute', !audioOn);
+    });
+
+    // Move basket with mouse
+    gameContainer.addEventListener('mousemove', (e) => {
+      const containerRect = gameContainer.getBoundingClientRect();
+      let basketX = e.clientX - containerRect.left - basket.offsetWidth / 2;
+
+      // Prevent basket from going outside container
+      basketX = Math.max(0, Math.min(basketX, containerRect.width - basket.offsetWidth));
+      basket.style.left = basketX + 'px';
+    });
+
+    // Generate random fruits
+    function spawnFruit() {
+      if (!isPlaying) return;
+
+      const fruitImages = [
+        './img/apple.png',
+        './img/lemon.png',
+        './img/orange.png',
+        './img/liquid.png'
+      ];
+
+      const fruit = document.createElement('div');
+      fruit.classList.add('fruit');
+      fruit.style.backgroundImage = `url(${fruitImages[Math.floor(Math.random() * fruitImages.length)]})`;
+
+      // Randomize starting position
+      const randomX = Math.floor(Math.random() * (gameContainer.offsetWidth - 50));
+      fruit.style.left = randomX + 'px';
+      fruit.style.top = '0px';
+
+      gameContainer.appendChild(fruit);
+
+      // Animate fruit falling
+      let fallInterval = setInterval(() => {
+        const fruitRect = fruit.getBoundingClientRect();
+        const basketRect = basket.getBoundingClientRect();
+        const containerRect = gameContainer.getBoundingClientRect();
+
+        if (fruitRect.top > containerRect.height - 50) {
+          clearInterval(fallInterval);
+          fruit.remove();
+          endGame();
+        }
+
+        // Check for collision with basket
+        if (
+          fruitRect.bottom >= basketRect.top &&
+          fruitRect.left < basketRect.right &&
+          fruitRect.right > basketRect.left
+        ) {
+          clearInterval(fallInterval);
+          fruit.remove();
+          score++;
+          scoreDisplay.textContent = `Score: ${score}`;
+          if (audioOn) gameAudio.play();
+        }
+
+        fruit.style.top = fruit.offsetTop + 5 + 'px';
+      }, 50);
+    }
+
+    // Start game
+    function startGame() {
+      score = 0;
+      scoreDisplay.textContent = `Score: ${score}`;
+      gameOverDisplay.style.display = 'none';
+      isPlaying = true;
+      gameInterval = setInterval(spawnFruit, 1000);
+    }
+
+    // Stop game
+    function stopGame() {
+      clearInterval(gameInterval);
+    }
+
+    // End game
+    function endGame() {
+      stopGame();
+      gameOverDisplay.style.display = 'block';
+      isPlaying = false;
+      playButton.classList.add('fa-play-circle');
+      playButton.classList.remove('fa-pause-circle');
+    }
+
+    // Restart game
+    restartButton.addEventListener('click', () => {
+      startGame();
+    });
+  </script>
+</body>
+</html>
